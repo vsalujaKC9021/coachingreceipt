@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Receipt Management System</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --ink:#16233b;--ink-2:#24365a;--paper:#f6f7f9;--card:#fff;--line:#e3e7ee;--line-2:#cfd6e2;
+    --muted:#68738a;--brand:#2f4b8f;--brand-d:#233a70;--money:#0f766e;--money-bg:#e6f4f1;
+    --amber:#b4690e;--amber-bg:#fdf3e3;--danger:#b42318;--danger-bg:#fdecea;--radius:10px;
+    --mono:"SFMono-Regular",ui-monospace,"Cascadia Mono","Segoe UI Mono",Menlo,Consolas,monospace;
+    --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}html,body{margin:0;padding:0}
+  body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:14px;line-height:1.45}
+  h1,h2,h3{margin:0;font-weight:650;letter-spacing:-.01em}
+  button{font-family:inherit;cursor:pointer}input,select,textarea{font-family:inherit;font-size:14px}
+  .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  header.app{background:var(--ink);color:#fff;padding:14px 22px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:30;box-shadow:0 1px 0 rgba(0,0,0,.15)}
+  header.app .brandmark{width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,var(--brand),#3d63b8);display:grid;place-items:center;font-weight:800;font-size:15px;flex:0 0 auto}
+  header.app h1{font-size:16px}header.app .sub{font-size:11.5px;color:#9fb0d0;margin-top:1px}
+  header.app .org-quick{margin-left:auto;text-align:right;font-size:11.5px;color:#b9c6de;line-height:1.35}
+  header.app .org-quick b{color:#fff;font-weight:600}
+  header.app .user-badge{display:flex;align-items:center;gap:12px;padding-left:16px;margin-left:16px;border-left:1px solid rgba(255,255,255,.15)}
+  header.app .user-badge .ub-name{font-size:13px;font-weight:600;color:#fff}
+  header.app .user-badge .ub-role{font-size:11px;color:#9fb0d0}
+  header.app .user-badge .ub-logout{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:7px;padding:6px 11px;font-size:12px;font-weight:550}
+  header.app .user-badge .ub-logout:hover{background:rgba(255,255,255,.2)}
+  nav.tabs{display:flex;gap:2px;background:var(--ink-2);padding:0 14px;position:sticky;top:62px;z-index:29}
+  nav.tabs button{background:transparent;border:0;color:#a9b6d2;padding:11px 16px 12px;font-size:13px;font-weight:550;border-bottom:2.5px solid transparent}
+  nav.tabs button:hover{color:#dbe4f5}nav.tabs button.active{color:#fff;border-bottom-color:var(--brand)}
+  body.no-edit .requires-edit{display:none !important}
+  body.no-export .requires-export{display:none !important}
+  body.no-admin .tab-admin{display:none !important}
+  main{max-width:1180px;margin:0 auto;padding:22px 22px 80px}
+  .panel{display:none}.panel.active{display:block;animation:fade .18s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+  .section-head{display:flex;align-items:center;gap:12px;margin:2px 0 16px}
+  .section-head h2{font-size:19px}
+  .section-head .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:650}
+  .section-head .spacer{flex:1}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
+  .card+.card{margin-top:16px}
+  .card h3{font-size:14px;margin-bottom:14px;color:var(--ink-2);display:flex;align-items:center;gap:8px}
+  .card h3 .tag{font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;background:var(--paper);color:var(--muted);border:1px solid var(--line);padding:2px 7px;border-radius:20px}
+  .btn{border:1px solid var(--line-2);background:#fff;color:var(--ink);border-radius:8px;padding:8px 13px;font-size:13px;font-weight:550;display:inline-flex;align-items:center;gap:7px}
+  .btn:hover{border-color:#a9b3c6;background:#fbfcfe}
+  .btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}.btn.primary:hover{background:var(--brand-d)}
+  .btn.money{background:var(--money);border-color:var(--money);color:#fff}.btn.money:hover{filter:brightness(.94)}
+  .btn.sm{padding:5px 9px;font-size:12px}
+  .btn.danger{color:var(--danger);border-color:#e7c3bf}.btn.danger:hover{background:var(--danger-bg)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .grid{display:grid;gap:14px}.g2{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}
+  @media(max-width:820px){.g2,.g3,.g4{grid-template-columns:1fr}}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:11.5px;font-weight:600;color:var(--muted);letter-spacing:.02em}
+  .field label .req{color:var(--danger)}
+  .field input,.field select,.field textarea{border:1px solid var(--line-2);border-radius:8px;padding:9px 11px;background:#fff;color:var(--ink);width:100%}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:2px solid #c6d3ef;border-color:var(--brand)}
+  .field textarea{resize:vertical;min-height:64px}.field .hint{font-size:11px;color:var(--muted)}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .search{position:relative}.search input{padding-left:32px;min-width:230px}
+  .search svg{position:absolute;left:9px;top:50%;transform:translateY(-50%);opacity:.5}
+  .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:var(--radius);background:#fff}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead th{background:#f3f5f9;text-align:left;padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:650;border-bottom:1px solid var(--line);white-space:nowrap}
+  tbody td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tbody tr:last-child td{border-bottom:0}tbody tr:hover{background:#fafbfd}
+  td.r,th.r{text-align:right}
+  .empty{padding:34px;text-align:center;color:var(--muted)}.empty .big{font-size:15px;color:var(--ink-2);font-weight:600;margin-bottom:4px}
+  .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid transparent}
+  .pill.gst-intra{background:var(--money-bg);color:var(--money);border-color:#bfe3dd}
+  .pill.gst-inter{background:var(--amber-bg);color:var(--amber);border-color:#f0d9b0}
+  .pill.pay{background:#eef2fb;color:var(--brand);border-color:#d4ddf2}
+  .items-tbl input,.items-tbl select{padding:7px 8px}.items-tbl td{padding:6px 6px}
+  .rm-row{color:var(--danger);border:0;background:transparent;font-size:16px;line-height:1;padding:4px 6px}
+  .rm-row:hover{background:var(--danger-bg);border-radius:6px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .chip{background:#eef2fb;border:1px solid #d4ddf2;color:var(--brand-d);border-radius:20px;padding:5px 6px 5px 12px;display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:550}
+  .chip button{border:0;background:transparent;color:var(--brand);font-size:15px;line-height:1;cursor:pointer;padding:0 2px}
+  .chip button:hover{color:var(--danger)}
+  .totals{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
+  .totals .row{display:flex;justify-content:space-between;padding:6px 0;font-size:13.5px}
+  .totals .row.sub{color:var(--muted)}
+  .totals .row.grand{border-top:2px solid var(--line-2);margin-top:8px;padding-top:12px;font-size:17px;font-weight:700}
+  .totals .row.grand .num{color:var(--money)}
+  .gst-note{font-size:12px;color:var(--muted);margin-top:6px;display:flex;align-items:center;gap:7px}
+  .divider{height:1px;background:var(--line);margin:16px 0}
+  .row-actions{display:flex;gap:4px;justify-content:flex-end}
+  .stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+  @media(max-width:820px){.stat-row{grid-template-columns:repeat(2,1fr)}}
+  .stat{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px}
+  .stat .k{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:650}
+  .stat .v{font-size:22px;font-weight:700;margin-top:4px}.stat .v.money{color:var(--money)}
+  .warnbar{background:var(--amber-bg);border:1px solid #f0d9b0;color:#7a4a08;border-radius:9px;padding:10px 14px;font-size:12.5px;margin-bottom:16px;display:flex;gap:9px;align-items:flex-start}
+  .role-tag{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600}
+  .role-admin{background:#efe6fb;color:#6b28b8;border:1px solid #dcc7f2}
+  .role-edit{background:var(--money-bg);color:var(--money);border:1px solid #bfe3dd}
+  .role-export{background:#eef2fb;color:var(--brand);border:1px solid #d4ddf2}
+  .role-view{background:#f0f2f5;color:var(--muted);border:1px solid var(--line)}
+  .overlay{position:fixed;inset:0;background:rgba(20,30,52,.5);display:none;align-items:flex-start;justify-content:center;z-index:60;padding:34px 16px;overflow:auto}
+  .overlay.open{display:flex}
+  .modal{background:#fff;border-radius:14px;width:100%;max-width:620px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  .modal .m-head{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+  .modal .m-head h3{font-size:16px}.modal .m-body{padding:20px}
+  .modal .m-foot{padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:9px;background:#fafbfd;border-radius:0 0 14px 14px}
+  .x{border:0;background:transparent;font-size:20px;color:var(--muted);cursor:pointer}
+  #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 18px;border-radius:9px;font-size:13.5px;font-weight:500;opacity:0;pointer-events:none;transition:.25s;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}#toast.err{background:var(--danger)}
+  #login{position:fixed;inset:0;z-index:200;background:linear-gradient(135deg,#16233b,#233a70);display:flex;align-items:center;justify-content:center;padding:20px}
+  #login.hidden{display:none}
+  #login .lbox{background:#fff;border-radius:16px;width:100%;max-width:400px;padding:34px 32px;box-shadow:0 24px 70px rgba(0,0,0,.4)}
+  #login .lmark{width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,var(--brand),#3d63b8);display:grid;place-items:center;font-weight:800;font-size:22px;color:#fff;margin-bottom:18px}
+  #login h2{font-size:20px;margin-bottom:4px}#login .lsub{color:var(--muted);font-size:13px;margin-bottom:22px}
+  #login .field{margin-bottom:14px}
+  #login .lerr{color:var(--danger);font-size:12.5px;min-height:16px;margin-bottom:6px}
+  #login .lhint{margin-top:16px;font-size:11.5px;color:var(--muted);text-align:center;line-height:1.5}
+  #receiptView{display:none}
+  .receipt{max-width:800px;margin:0 auto;background:#fff;color:#111;border:1px solid var(--line);border-radius:12px;padding:34px 38px}
+  .receipt .r-top{display:flex;justify-content:space-between;gap:20px;border-bottom:2px solid var(--ink);padding-bottom:16px}
+  .receipt .r-org h2{font-size:19px;color:var(--ink)}
+  .receipt .r-org .meta{font-size:12px;color:#444;margin-top:5px;line-height:1.5;white-space:pre-line}
+  .receipt .r-title{text-align:right}.receipt .r-title .big{font-size:24px;font-weight:800;letter-spacing:.04em;color:var(--ink)}
+  .receipt .r-title .no{font-family:var(--mono);font-size:13px;margin-top:6px}
+  .receipt .r-parties{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:20px 0}
+  .receipt .r-parties h4{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px}
+  .receipt .r-parties .box{font-size:12.5px;line-height:1.55}
+  .receipt table.r-items{width:100%;border-collapse:collapse;margin-top:6px}
+  .receipt table.r-items th{background:var(--ink);color:#fff;font-size:11px;text-transform:uppercase;padding:8px 10px;text-align:left}
+  .receipt table.r-items th.r,.receipt table.r-items td.r{text-align:right}
+  .receipt table.r-items td{padding:8px 10px;border-bottom:1px solid var(--line);font-size:12.5px}
+  .receipt .r-bottom{display:grid;grid-template-columns:1.1fr .9fr;gap:24px;margin-top:20px}
+  .receipt .r-tot .line{display:flex;justify-content:space-between;padding:5px 0;font-size:13px}
+  .receipt .r-tot .line.grand{border-top:2px solid var(--ink);margin-top:6px;padding-top:9px;font-weight:800;font-size:16px}
+  .receipt .r-pay{font-size:12.5px;line-height:1.6}
+  .receipt .r-pay h4{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px}
+  .receipt .r-sign{margin-top:44px;text-align:right;font-size:12px;color:#333}
+  .receipt .r-foot{margin-top:24px;padding-top:12px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);text-align:center}
+  @media print{
+    body{background:#fff}header.app,nav.tabs,#toast,.no-print,#login{display:none !important}
+    main{padding:0;max-width:none}.panel{display:none !important}#receiptView{display:block !important}
+    .receipt{border:0;border-radius:0;max-width:none;padding:0;margin:0}@page{size:A4;margin:14mm}
+  }
+</style>
+</head>
+<body class="no-edit no-export no-admin">
+
+<header class="app">
+  <div class="brandmark">₹R</div>
+  <div><h1>Receipt Management System</h1><div class="sub">Server edition · shared data · central login</div></div>
+  <div class="org-quick" id="orgQuick"></div>
+  <div class="user-badge no-print" id="userBadge" style="display:none">
+    <div><div class="ub-name" id="ubName"></div><div class="ub-role" id="ubRole"></div></div>
+    <button class="ub-logout" id="btnLogout">Sign out</button>
+  </div>
+</header>
+
+<nav class="tabs no-print" id="tabs">
+  <button data-tab="receipt" class="active">New Receipt</button>
+  <button data-tab="transactions">Transactions</button>
+  <button data-tab="partners">Partners</button>
+  <button data-tab="services">Service Rates</button>
+  <button data-tab="settings">Settings</button>
+  <button data-tab="users" class="tab-admin">Users</button>
+</nav>
+
+<main>
+  <!-- NEW RECEIPT -->
+  <section class="panel active" id="tab-receipt">
+    <div class="section-head"><div><div class="eyebrow">Create</div><h2>New Receipt</h2></div><div class="spacer"></div><button class="btn" id="resetReceipt">Clear form</button></div>
+    <div class="card"><h3>Receipt details</h3>
+      <div class="grid g4">
+        <div class="field"><label>Receipt No.</label><input id="rcpNo" readonly /></div>
+        <div class="field"><label>Date <span class="req">*</span></label><input type="date" id="rcpDate" /></div>
+        <div class="field" style="grid-column:span 2"><label>Partner / Bill to <span class="req">*</span></label><select id="rcpPartner"><option value="">— Select partner —</option></select><div class="hint">GST type is decided automatically from the partner's state.</div></div>
+      </div>
+    </div>
+    <div class="card"><h3>Students <span class="tag">multiple allowed</span></h3>
+      <div class="toolbar"><div class="field" style="flex:1;min-width:220px"><input id="studentInput" placeholder="Type a student name and press Enter or Add" /></div><button class="btn" id="addStudent">Add student</button></div>
+      <div class="chips" id="studentChips"></div>
+    </div>
+    <div class="card"><h3>Services</h3>
+      <div class="table-wrap"><table class="items-tbl"><thead><tr><th style="min-width:200px">Service</th><th>HSN</th><th class="r">Rate (Taxable)</th><th class="r" style="width:70px">Qty</th><th class="r" style="width:90px">GST %</th><th class="r">Amount</th><th style="width:40px"></th></tr></thead><tbody id="itemRows"></tbody></table></div>
+      <div style="margin-top:12px"><button class="btn" id="addItem">+ Add service line</button></div>
+    </div>
+    <div class="grid g2">
+      <div class="card"><h3>Payment</h3>
+        <div class="grid g2">
+          <div class="field"><label>Method <span class="req">*</span></label><select id="payMethod"><option value="Cash">Cash</option><option value="Cheque">Cheque</option><option value="Bank Transfer">Bank Transfer</option><option value="NEFT / RTGS">NEFT / RTGS</option><option value="UPI">UPI</option></select></div>
+          <div class="field" id="fieldRef" style="display:none"><label>Transaction / Ref. No. <span class="req">*</span></label><input id="payRef" placeholder="e.g. UTR / Cheque no. / UPI ref" /></div>
+          <div class="field" id="fieldBank" style="display:none"><label>Bank Name <span class="req">*</span></label><input id="payBank" placeholder="e.g. HDFC Bank" /></div>
+          <div class="field"><label>Paid Amount</label><input id="payPaid" type="number" step="0.01" placeholder="Leave blank for full payment" /><div class="hint">Blank = fully paid. Enter a lower value for part payment.</div></div>
+          <div class="field"><label>Prepaid by</label><input id="payPrepaidBy" placeholder="Name of person who paid" /></div>
+        </div>
+        <div class="divider"></div>
+        <div class="field"><label>Note / Remark <span style="font-weight:500;color:var(--muted)">(for reference)</span></label><textarea id="payNote" placeholder="Any reference note…"></textarea></div>
+      </div>
+      <div class="card"><h3>Summary</h3>
+        <div class="totals" id="totalsBox">
+          <div class="row sub"><span>Taxable value</span><span class="num" id="tTaxable">₹0.00</span></div>
+          <div id="taxLines"></div>
+          <div class="row grand"><span>Grand total</span><span class="num" id="tGrand">₹0.00</span></div>
+          <div class="row sub" style="margin-top:8px"><span>Paid amount</span><span class="num" id="tPaid">₹0.00</span></div>
+          <div class="row" id="balRow"><span style="font-weight:600">Balance amount</span><span class="num" id="tBalance" style="font-weight:600">₹0.00</span></div>
+        </div>
+        <div class="gst-note" id="gstNote"></div>
+      </div>
+    </div>
+    <div class="card no-print"><div class="toolbar">
+      <button class="btn money requires-edit" id="saveReceipt">Save to Transactions</button>
+      <button class="btn" id="previewReceipt">Preview</button>
+      <button class="btn primary requires-edit" id="savePrint">Save &amp; Print / PDF</button>
+    </div></div>
+  </section>
+
+  <!-- TRANSACTIONS -->
+  <section class="panel" id="tab-transactions">
+    <div class="section-head"><div><div class="eyebrow">Ledger</div><h2>Transaction Database</h2></div><div class="spacer"></div><button class="btn requires-export" id="txExport">⤓ Export Excel</button></div>
+    <div class="stat-row">
+      <div class="stat"><div class="k">Receipts</div><div class="v num" id="stCount">0</div></div>
+      <div class="stat"><div class="k">Grand total</div><div class="v money num" id="stGrand">₹0</div></div>
+      <div class="stat"><div class="k">Paid</div><div class="v money num" id="stPaid">₹0</div></div>
+      <div class="stat"><div class="k">Balance due</div><div class="v num" id="stBalance">₹0</div></div>
+    </div>
+    <div class="toolbar no-print" style="margin-bottom:12px">
+      <div class="search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input id="txSearch" placeholder="Search receipt no., partner, student, note…" /></div>
+      <select id="txFilterPay" class="btn" style="padding:8px 10px"></select>
+    </div>
+    <div class="table-wrap"><table><thead><tr><th>Receipt No.</th><th>Date</th><th>Partner</th><th>Students</th><th>GST</th><th>Payment</th><th class="r">Total</th><th class="r">Paid</th><th class="r">Balance</th><th>Note</th><th></th></tr></thead><tbody id="txRows"></tbody></table></div>
+  </section>
+
+  <!-- PARTNERS -->
+  <section class="panel" id="tab-partners">
+    <div class="section-head"><div><div class="eyebrow">Master</div><h2>Partner Database</h2></div><div class="spacer"></div><button class="btn requires-edit" id="pImport">⤒ Import Excel</button><button class="btn requires-export" id="pExport">⤓ Export Excel</button><button class="btn primary requires-edit" id="pAdd">+ Add partner</button></div>
+    <div class="toolbar no-print" style="margin-bottom:12px"><div class="search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input id="pSearch" placeholder="Search partners…" /></div></div>
+    <div class="table-wrap"><table><thead><tr><th>Name</th><th>GST No.</th><th>State</th><th>Email</th><th>Phone</th><th>Address</th><th></th></tr></thead><tbody id="pRows"></tbody></table></div>
+    <input type="file" id="pFile" accept=".xlsx,.xls,.csv" hidden />
+  </section>
+
+  <!-- SERVICES -->
+  <section class="panel" id="tab-services">
+    <div class="section-head"><div><div class="eyebrow">Master</div><h2>Service Rate List</h2></div><div class="spacer"></div><button class="btn requires-edit" id="sImport">⤒ Import Excel</button><button class="btn requires-export" id="sExport">⤓ Export Excel</button><button class="btn primary requires-edit" id="sAdd">+ Add service</button></div>
+    <div class="toolbar no-print" style="margin-bottom:12px"><div class="search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input id="sSearch" placeholder="Search services…" /></div></div>
+    <div class="table-wrap"><table><thead><tr><th>Service Name</th><th>HSN / SAC</th><th class="r">Rate (Taxable Value)</th><th class="r">Default GST %</th><th></th></tr></thead><tbody id="sRows"></tbody></table></div>
+    <input type="file" id="sFile" accept=".xlsx,.xls,.csv" hidden />
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="panel" id="tab-settings">
+    <div class="section-head"><div><div class="eyebrow">Configure</div><h2>Organization</h2></div></div>
+    <div class="card"><h3>Your organization <span class="tag">appears on receipts</span></h3>
+      <div class="grid g2">
+        <div class="field"><label>Organization name</label><input id="orgName" /></div>
+        <div class="field"><label>GST No.</label><input id="orgGst" /></div>
+        <div class="field"><label>State (home state) <span class="req">*</span></label><select id="orgState"></select><div class="hint">CGST+SGST when partner is in this state, otherwise IGST.</div></div>
+        <div class="field"><label>Phone</label><input id="orgPhone" /></div>
+        <div class="field"><label>Email</label><input id="orgEmail" /></div>
+        <div class="field"><label>Receipt prefix</label><input id="orgPrefix" placeholder="e.g. RCPT" /></div>
+        <div class="field" style="grid-column:span 2"><label>Address</label><textarea id="orgAddress"></textarea></div>
+        <div class="field"><label>Receipt footer note</label><input id="orgFooter" /></div>
+      </div>
+      <div class="divider"></div>
+      <button class="btn primary requires-edit" id="saveOrg">Save organization</button>
+    </div>
+  </section>
+
+  <!-- USERS -->
+  <section class="panel" id="tab-users">
+    <div class="section-head"><div><div class="eyebrow">Access</div><h2>User Management</h2></div><div class="spacer"></div><button class="btn primary" id="uAdd">+ Add user</button></div>
+    <div class="table-wrap"><table><thead><tr><th>Username</th><th>Full name</th><th>Rights</th><th></th></tr></thead><tbody id="uRows"></tbody></table></div>
+    <div class="card" style="margin-top:16px"><h3>What each right allows</h3>
+      <div style="font-size:13px;line-height:1.7;color:var(--ink-2)">
+        <div><span class="role-tag role-view">View</span> &nbsp;See all tabs and print existing receipts. No changes.</div>
+        <div style="margin-top:6px"><span class="role-tag role-edit">Edit</span> &nbsp;Create receipts; add/edit/delete partners &amp; services; import.</div>
+        <div style="margin-top:6px"><span class="role-tag role-export">Export</span> &nbsp;Download Excel exports.</div>
+        <div style="margin-top:6px"><span class="role-tag role-admin">Admin</span> &nbsp;Everything, plus manage users. Rights are enforced on the server.</div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="receiptView"></div>
+
+<div class="overlay" id="overlay"><div class="modal">
+  <div class="m-head"><h3 id="mTitle">Edit</h3><button class="x" id="mClose">×</button></div>
+  <div class="m-body" id="mBody"></div>
+  <div class="m-foot"><button class="btn" id="mCancel">Cancel</button><button class="btn primary" id="mSave">Save</button></div>
+</div></div>
+
+<div id="toast"></div>
+
+<div id="login"><div class="lbox">
+  <div class="lmark">₹R</div><h2>Receipt Management System</h2><div class="lsub">Sign in to continue</div>
+  <div class="field"><label>Username</label><input id="loginUser" autocomplete="username" /></div>
+  <div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password" /></div>
+  <div class="lerr" id="loginErr"></div>
+  <button class="btn primary" id="btnLogin" style="width:100%;justify-content:center;padding:11px">Sign in</button>
+  <div class="lhint" id="loginHint"></div>
+</div></div>
+
+<script>
+"use strict";
+const STATES=["Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh","Goa","Gujarat","Haryana","Himachal Pradesh","Jharkhand","Karnataka","Kerala","Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Punjab","Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal","Andaman and Nicobar Islands","Chandigarh","Dadra and Nagar Haveli and Daman and Diu","Delhi","Jammu and Kashmir","Ladakh","Lakshadweep","Puducherry"];
+const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
+const money=n=>'₹'+(Number(n)||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const money0=n=>'₹'+Math.round(Number(n)||0).toLocaleString('en-IN');
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let toastT; function toast(m,err){const t=$('#toast');t.textContent=m;t.className='show'+(err?' err':'');clearTimeout(toastT);toastT=setTimeout(()=>t.className='',2600);}
+
+/* ---- API layer ---- */
+async function api(pathname, method, body){
+  const opt={method:method||'GET',headers:{},credentials:'same-origin'};
+  if(body){opt.headers['Content-Type']='application/json';opt.body=JSON.stringify(body);}
+  const res=await fetch(pathname,opt);
+  let data={}; try{data=await res.json();}catch{}
+  if(!res.ok){ const err=new Error(data.error||('HTTP '+res.status)); err.status=res.status; err.data=data; throw err; }
+  return data;
+}
+
+/* ---- State ---- */
+let ST={org:{},partners:[],services:[],transactions:[],users:[]};
+let currentUser=null;
+function can(p){ if(!currentUser) return false; if(p==='view') return true; return !!(currentUser.rights&&currentUser.rights[p]); }
+function roleLabel(r){ if(!r) return ''; if(r.admin) return 'Admin'; const a=[]; if(r.edit)a.push('Edit'); if(r.export)a.push('Export'); return a.length?a.join(' + '):'View only'; }
+
+async function refreshState(){
+  const d=await api('/api/state');
+  ST.org=d.org||{}; ST.partners=d.partners||[]; ST.services=d.services||[]; ST.transactions=d.transactions||[]; ST.users=d.users||[];
+  currentUser=d.me||currentUser;
+  renderAll();
+}
+function renderAll(){ paintOrgHeader(); fillOrgForm(); fillPartnerSelect(); renderPartners(); renderServices(); renderUsers(); txFilterPayOptions(); renderTx(); recalc(); }
+
+/* ---- Auth / permissions ---- */
+function applyPermissions(){
+  document.body.classList.toggle('no-edit',!can('edit'));
+  document.body.classList.toggle('no-export',!can('export'));
+  document.body.classList.toggle('no-admin',!can('admin'));
+  $('#userBadge').style.display='flex';
+  $('#ubName').textContent=currentUser.name||currentUser.username;
+  $('#ubRole').textContent=roleLabel(currentUser.rights);
+}
+async function doLogin(){
+  try{
+    const d=await api('/api/login','POST',{username:$('#loginUser').value.trim(),password:$('#loginPass').value});
+    currentUser=d.user; $('#loginErr').textContent=''; $('#loginPass').value='';
+    $('#login').classList.add('hidden'); applyPermissions();
+    await refreshState(); refreshReceiptNo(); resetReceiptForm();
+    $('#tabs button[data-tab="receipt"]').click();
+  }catch(e){ $('#loginErr').textContent=e.message||'Sign in failed.'; }
+}
+function showLogin(hint){
+  currentUser=null; $('#userBadge').style.display='none'; $('#login').classList.remove('hidden');
+  $('#loginUser').value=''; $('#loginPass').value=''; $('#loginErr').textContent='';
+  $('#loginHint').innerHTML=hint?'First time? Sign in with <b>admin</b> / <b>admin</b>, then change the password in the Users tab.':'';
+  setTimeout(()=>$('#loginUser').focus(),50);
+}
+$('#btnLogin').onclick=doLogin;
+$('#loginUser').addEventListener('keydown',e=>{if(e.key==='Enter')$('#loginPass').focus();});
+$('#loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+$('#btnLogout').onclick=async()=>{ try{await api('/api/logout','POST',{});}catch{} showLogin(false); };
+
+/* ---- Tabs ---- */
+$('#tabs').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  if(b.dataset.tab==='users'&&!can('admin')) return;
+  $$('#tabs button').forEach(x=>x.classList.remove('active')); b.classList.add('active');
+  $$('.panel').forEach(p=>p.classList.remove('active')); $('#tab-'+b.dataset.tab).classList.add('active');
+});
+
+/* ---- Modal ---- */
+let modalSaveFn=null;
+function openModal(title,html,onSave){ $('#mTitle').textContent=title; $('#mBody').innerHTML=html; modalSaveFn=onSave; $('#overlay').classList.add('open'); const f=$('#mBody input,select,textarea'); if(f)f.focus(); }
+function closeModal(){ $('#overlay').classList.remove('open'); modalSaveFn=null; }
+$('#mClose').onclick=closeModal; $('#mCancel').onclick=closeModal;
+$('#overlay').onclick=e=>{ if(e.target.id==='overlay')closeModal(); };
+$('#mSave').onclick=async()=>{ if(modalSaveFn){ const r=await modalSaveFn(); if(r!==false) closeModal(); } };
+
+/* ================= RECEIPT ================= */
+let students=[], items=[];
+function newItem(){ return {id:Math.random().toString(36).slice(2),serviceId:'',name:'',hsn:'',rate:0,qty:1,gst:18}; }
+function fillPartnerSelect(){ const sel=$('#rcpPartner'),cur=sel.value; sel.innerHTML='<option value="">— Select partner —</option>'+ST.partners.map(p=>`<option value="${p.id}">${esc(p.name)} — ${esc(p.state||'')}</option>`).join(''); sel.value=cur; }
+function renderStudents(){ const b=$('#studentChips'); b.innerHTML=students.length?students.map((s,i)=>`<span class="chip">${esc(s)}<button data-i="${i}">×</button></span>`).join(''):'<span style="color:var(--muted);font-size:12.5px">No students added yet.</span>'; b.querySelectorAll('button').forEach(x=>x.onclick=()=>{students.splice(+x.dataset.i,1);renderStudents();}); }
+function addStudent(){ const v=$('#studentInput').value.trim(); if(!v)return; students.push(v); $('#studentInput').value=''; renderStudents(); }
+$('#addStudent').onclick=addStudent;
+$('#studentInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addStudent();}});
+function serviceOptions(sel){ return '<option value="">— Select —</option>'+ST.services.map(s=>`<option value="${s.id}" ${s.id===sel?'selected':''}>${esc(s.name)}</option>`).join(''); }
+function renderItems(){
+  const tb=$('#itemRows'); if(!items.length) items.push(newItem());
+  tb.innerHTML=items.map(it=>{const amt=(Number(it.rate)||0)*(Number(it.qty)||0);return `<tr data-id="${it.id}">
+    <td><select class="it-service">${serviceOptions(it.serviceId)}</select></td>
+    <td><input class="it-hsn" value="${esc(it.hsn)}" style="width:90px"/></td>
+    <td class="r"><input class="it-rate num r" value="${it.rate}" style="width:110px;text-align:right"/></td>
+    <td class="r"><input class="it-qty num r" value="${it.qty}" style="text-align:right"/></td>
+    <td class="r"><input class="it-gst num r" value="${it.gst}" style="text-align:right"/></td>
+    <td class="r num">${money(amt)}</td>
+    <td><button class="rm-row">×</button></td></tr>`;}).join('');
+  tb.querySelectorAll('tr').forEach(tr=>{const it=items.find(x=>x.id===tr.dataset.id);
+    tr.querySelector('.it-service').onchange=e=>{it.serviceId=e.target.value;const s=ST.services.find(x=>x.id===it.serviceId);if(s){it.name=s.name;it.hsn=s.hsn;it.rate=Number(s.rate)||0;if(s.gst!=null&&s.gst!=='')it.gst=Number(s.gst);}renderItems();recalc();};
+    tr.querySelector('.it-hsn').oninput=e=>{it.hsn=e.target.value;};
+    tr.querySelector('.it-rate').oninput=e=>{it.rate=parseFloat(e.target.value)||0;liveAmt(tr,it);recalc();};
+    tr.querySelector('.it-qty').oninput=e=>{it.qty=parseFloat(e.target.value)||0;liveAmt(tr,it);recalc();};
+    tr.querySelector('.it-gst').oninput=e=>{it.gst=parseFloat(e.target.value)||0;recalc();};
+    tr.querySelector('.rm-row').onclick=()=>{items=items.filter(x=>x.id!==it.id);if(!items.length)items.push(newItem());renderItems();recalc();};
+  }); recalc();
+}
+function liveAmt(tr,it){ tr.querySelector('td.num').textContent=money((Number(it.rate)||0)*(Number(it.qty)||0)); }
+$('#addItem').onclick=()=>{items.push(newItem());renderItems();};
+function selectedPartner(){ return ST.partners.find(p=>p.id===$('#rcpPartner').value); }
+function isIntra(){ const p=selectedPartner(); if(!p) return true; return (p.state||'').trim().toLowerCase()===(ST.org.state||'').trim().toLowerCase(); }
+function computeTotals(){ let taxable=0,cgst=0,sgst=0,igst=0; const intra=isIntra(); items.forEach(it=>{const base=(Number(it.rate)||0)*(Number(it.qty)||0);const tax=base*(Number(it.gst)||0)/100;taxable+=base;if(intra){cgst+=tax/2;sgst+=tax/2;}else igst+=tax;}); return {taxable,cgst,sgst,igst,grand:taxable+cgst+sgst+igst,intra}; }
+function recalc(){
+  const t=computeTotals(); $('#tTaxable').textContent=money(t.taxable);
+  $('#taxLines').innerHTML=t.intra?`<div class="row sub"><span>CGST</span><span class="num">${money(t.cgst)}</span></div><div class="row sub"><span>SGST</span><span class="num">${money(t.sgst)}</span></div>`:`<div class="row sub"><span>IGST</span><span class="num">${money(t.igst)}</span></div>`;
+  $('#tGrand').textContent=money(t.grand);
+  const pr=$('#payPaid').value.trim(); const paid=pr===''?t.grand:(parseFloat(pr)||0); const bal=t.grand-paid;
+  $('#tPaid').textContent=money(paid); $('#tBalance').textContent=money(bal);
+  $('#balRow').style.color=bal>0.001?'var(--danger)':(bal<-0.001?'var(--amber)':'var(--money)');
+  const p=selectedPartner();
+  if(!p) $('#gstNote').innerHTML='<span class="pill gst-intra">Awaiting partner</span> Select a partner to lock GST treatment.';
+  else if(t.intra) $('#gstNote').innerHTML=`<span class="pill gst-intra">Intra-state · CGST + SGST</span> Partner is in ${esc(p.state)}.`;
+  else $('#gstNote').innerHTML=`<span class="pill gst-inter">Inter-state · IGST</span> Partner is in ${esc(p.state)}, outside ${esc(ST.org.state)}.`;
+}
+$('#rcpPartner').onchange=recalc; $('#payPaid').addEventListener('input',recalc);
+function updatePayFields(){ const needs=$('#payMethod').value!=='Cash'; $('#fieldRef').style.display=needs?'':'none'; $('#fieldBank').style.display=needs?'':'none'; }
+$('#payMethod').onchange=updatePayFields;
+async function refreshReceiptNo(){ try{const d=await api('/api/nextno');$('#rcpNo').value=d.no;}catch{} }
+function resetReceiptForm(){ students=[];items=[newItem()];$('#rcpDate').value=new Date().toISOString().slice(0,10);$('#rcpPartner').value='';$('#payMethod').value='Cash';$('#payRef').value='';$('#payBank').value='';$('#payPaid').value='';$('#payNote').value='';$('#payPrepaidBy').value='';renderStudents();renderItems();updatePayFields();refreshReceiptNo(); }
+$('#resetReceipt').onclick=resetReceiptForm;
+
+function buildReceipt(){
+  if(!$('#rcpDate').value){toast('Please pick a date.',1);return null;}
+  const p=selectedPartner(); if(!p){toast('Please select a partner.',1);return null;}
+  const valid=items.filter(it=>it.name&&(Number(it.rate)||0)>0&&(Number(it.qty)||0)>0);
+  if(!valid.length){toast('Add at least one service line with rate & qty.',1);return null;}
+  const m=$('#payMethod').value; let ref='',bank='';
+  if(m!=='Cash'){ ref=$('#payRef').value.trim(); bank=$('#payBank').value.trim(); if(!ref){toast('Ref. No. required for '+m+'.',1);return null;} if(!bank){toast('Bank Name required for '+m+'.',1);return null;} }
+  const t=computeTotals(); const pr=$('#payPaid').value.trim(); const paid=pr===''?t.grand:(parseFloat(pr)||0); const balance=t.grand-paid;
+  const lineItems=valid.map(it=>{const base=(Number(it.rate)||0)*(Number(it.qty)||0);const tax=base*(Number(it.gst)||0)/100;return {name:it.name,hsn:it.hsn,rate:Number(it.rate)||0,qty:Number(it.qty)||0,gst:Number(it.gst)||0,taxable:base,cgst:t.intra?tax/2:0,sgst:t.intra?tax/2:0,igst:t.intra?0:tax,amount:base+tax};});
+  return { date:$('#rcpDate').value, partner:{name:p.name,gst:p.gst,state:p.state,address:p.address,email:p.email,phone:p.phone}, partnerId:p.id, students:[...students], items:lineItems, gstType:t.intra?'CGST+SGST':'IGST', payment:{method:m,ref,bank,prepaidBy:$('#payPrepaidBy').value.trim()}, totals:{taxable:t.taxable,cgst:t.cgst,sgst:t.sgst,igst:t.igst,grand:t.grand,paid,balance}, note:$('#payNote').value.trim() };
+}
+async function saveReceipt(thenPrint){
+  if(!can('edit')){toast('You do not have edit rights.',1);return;}
+  const r=buildReceipt(); if(!r) return;
+  try{
+    const d=await api('/api/transactions/create','POST',{receipt:r});
+    ST.transactions=d.transactions; renderTx();
+    toast('Receipt '+d.receipt.no+' saved.');
+    if(thenPrint){ renderReceiptHTML(d.receipt); setTimeout(()=>window.print(),300); }
+    resetReceiptForm();
+  }catch(e){ toast(e.message||'Save failed.',1); }
+}
+$('#saveReceipt').onclick=()=>saveReceipt(false);
+$('#savePrint').onclick=()=>saveReceipt(true);
+$('#previewReceipt').onclick=()=>{ const r=buildReceipt(); if(!r) return; r.no=$('#rcpNo').value; renderReceiptHTML(r); openReceiptPreview(); };
+
+function openReceiptPreview(){
+  const rv=$('#receiptView'); rv.style.display='block'; rv.scrollIntoView({behavior:'smooth'});
+  if(!$('#rvBar')){ const bar=document.createElement('div'); bar.id='rvBar'; bar.className='no-print';
+    bar.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:80;background:#fff;padding:8px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.25);border:1px solid var(--line)';
+    bar.innerHTML='<button class="btn primary" id="rvPrint">Print / Save PDF</button><button class="btn" id="rvClose">Close preview</button>';
+    document.body.appendChild(bar); $('#rvPrint').onclick=()=>window.print(); $('#rvClose').onclick=()=>{rv.style.display='none';bar.remove();};
+  }
+}
+function renderReceiptHTML(r){
+  const org=ST.org;
+  const orgAddr=[org.address].filter(Boolean).join('\n');
+  const orgMeta=[org.gst?('GSTIN: '+org.gst):'',org.state?('State: '+org.state):'',org.phone?('Ph: '+org.phone):'',org.email].filter(Boolean).join('\n');
+  const pMeta=[r.partner.address||'',r.partner.gst?('GSTIN: '+r.partner.gst):'',r.partner.state?('State: '+r.partner.state):'',r.partner.phone?('Ph: '+r.partner.phone):'',r.partner.email||''].filter(Boolean).join('\n');
+  const intra=r.gstType==='CGST+SGST';
+  const rows=r.items.map(it=>`<tr><td>${esc(it.name)}</td><td>${esc(it.hsn)}</td><td class="r num">${money(it.rate)}</td><td class="r num">${it.qty}</td><td class="r num">${it.gst}%</td><td class="r num">${money(it.taxable)}</td><td class="r num">${money(it.amount)}</td></tr>`).join('');
+  const taxLines=intra?`<div class="line"><span>CGST</span><span class="num">${money(r.totals.cgst)}</span></div><div class="line"><span>SGST</span><span class="num">${money(r.totals.sgst)}</span></div>`:`<div class="line"><span>IGST</span><span class="num">${money(r.totals.igst)}</span></div>`;
+  const payExtra=r.payment.method!=='Cash'?`<div><b>Ref / Txn No.:</b> ${esc(r.payment.ref)}</div><div><b>Bank:</b> ${esc(r.payment.bank)}</div>`:'';
+  $('#receiptView').innerHTML=`<div class="receipt">
+    <div class="r-top"><div class="r-org"><h2>${esc(org.name)}</h2><div class="meta">${esc(orgAddr)}${orgAddr&&orgMeta?'\n':''}${esc(orgMeta)}</div></div>
+      <div class="r-title"><div class="big">RECEIPT</div><div class="no"><b>${esc(r.no||'')}</b><br>Date: ${esc(r.date)}</div></div></div>
+    <div class="r-parties"><div><h4>Bill To</h4><div class="box"><b>${esc(r.partner.name)}</b><br>${esc(pMeta).replace(/\n/g,'<br>')}</div></div>
+      <div><h4>Students</h4><div class="box">${r.students.length?r.students.map(esc).join(', '):'—'}</div></div></div>
+    <table class="r-items"><thead><tr><th>Service</th><th>HSN/SAC</th><th class="r">Rate</th><th class="r">Qty</th><th class="r">GST%</th><th class="r">Taxable</th><th class="r">Amount</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="r-bottom">
+      <div class="r-pay"><h4>Payment</h4><div><b>Method:</b> ${esc(r.payment.method)}</div>${r.payment.prepaidBy?`<div><b>Prepaid by:</b> ${esc(r.payment.prepaidBy)}</div>`:''}${payExtra}<div style="margin-top:8px"><b>GST treatment:</b> ${intra?'Intra-state (CGST + SGST)':'Inter-state (IGST)'}</div></div>
+      <div class="r-tot"><div class="line"><span>Taxable value</span><span class="num">${money(r.totals.taxable)}</span></div>${taxLines}<div class="line grand"><span>Grand Total</span><span class="num">${money(r.totals.grand)}</span></div><div class="line" style="margin-top:6px"><span>Paid Amount</span><span class="num">${money(r.totals.paid!=null?r.totals.paid:r.totals.grand)}</span></div><div class="line" style="font-weight:700${(r.totals.balance||0)>0.001?';color:#b42318':''}"><span>Balance Amount</span><span class="num">${money(r.totals.balance!=null?r.totals.balance:0)}</span></div></div>
+    </div>
+    ${r.note?`<div style="margin-top:18px;font-size:12.5px"><b style="text-transform:uppercase;font-size:11px;letter-spacing:.08em;color:var(--muted)">Note</b><div style="margin-top:4px;white-space:pre-line">${esc(r.note)}</div></div>`:''}
+    <div class="r-sign">For ${esc(org.name)}<br><br><br>Authorised Signatory</div>
+    <div class="r-foot">${esc(org.footer||'')}</div></div>`;
+}
+
+/* ================= TRANSACTIONS ================= */
+function txFilterPayOptions(){ $('#txFilterPay').innerHTML='<option value="">All payment methods</option>'+['Cash','Cheque','Bank Transfer','NEFT / RTGS','UPI'].map(m=>`<option>${m}</option>`).join(''); }
+function renderTx(){
+  const q=($('#txSearch').value||'').toLowerCase(), pf=$('#txFilterPay').value;
+  const rows=ST.transactions.filter(r=>{ if(pf&&r.payment.method!==pf)return false; if(!q)return true; return (r.no+' '+r.partner.name+' '+r.students.join(' ')+' '+(r.note||'')).toLowerCase().includes(q); });
+  const tb=$('#txRows');
+  if(!rows.length){ tb.innerHTML=`<tr><td colspan="11"><div class="empty"><div class="big">No transactions yet</div>Create a receipt and it appears here for everyone.</div></td></tr>`; }
+  else tb.innerHTML=rows.map(r=>{
+    const gstPill=r.gstType==='IGST'?'<span class="pill gst-inter">IGST</span>':'<span class="pill gst-intra">CGST+SGST</span>';
+    const stud=r.students.length?esc(r.students.slice(0,2).join(', '))+(r.students.length>2?` +${r.students.length-2}`:''):'—';
+    const paid=r.totals.paid!=null?r.totals.paid:r.totals.grand, bal=r.totals.balance!=null?r.totals.balance:0;
+    const balCell=bal>0.001?`<span style="color:var(--danger);font-weight:600">${money(bal)}</span>`:`<span style="color:var(--money)">${money(bal)}</span>`;
+    const noteCell=r.note?`<span title="${esc(r.note)}">${esc(r.note.length>28?r.note.slice(0,28)+'…':r.note)}</span>`:'<span style="color:var(--muted)">—</span>';
+    return `<tr><td><b>${esc(r.no)}</b></td><td class="num">${esc(r.date)}</td><td>${esc(r.partner.name)}<div style="font-size:11px;color:var(--muted)">${esc(r.partner.state||'')}</div></td><td>${stud}</td><td>${gstPill}</td><td><span class="pill pay">${esc(r.payment.method)}</span></td><td class="r num"><b>${money(r.totals.grand)}</b></td><td class="r num">${money(paid)}</td><td class="r num">${balCell}</td><td style="max-width:170px;font-size:12px">${noteCell}</td><td><div class="row-actions"><button class="btn sm" data-print="${r.id}">Print</button>${can('edit')?`<button class="btn sm danger" data-del="${r.id}">Del</button>`:''}</div></td></tr>`;
+  }).join('');
+  tb.querySelectorAll('[data-print]').forEach(b=>b.onclick=()=>{const r=ST.transactions.find(x=>x.id===b.dataset.print);renderReceiptHTML(r);openReceiptPreview();});
+  tb.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{ if(!confirm('Delete this receipt for everyone?'))return; try{const d=await api('/api/transactions/delete','POST',{id:b.dataset.del});ST.transactions=d.transactions;renderTx();toast('Receipt deleted.');}catch(e){toast(e.message,1);} });
+  const tot=ST.transactions.reduce((a,r)=>{a.grand+=r.totals.grand;a.paid+=(r.totals.paid!=null?r.totals.paid:r.totals.grand);a.balance+=(r.totals.balance!=null?r.totals.balance:0);return a;},{grand:0,paid:0,balance:0});
+  $('#stCount').textContent=ST.transactions.length; $('#stGrand').textContent=money0(tot.grand); $('#stPaid').textContent=money0(tot.paid);
+  const sb=$('#stBalance'); sb.textContent=money0(tot.balance); sb.style.color=tot.balance>0.5?'var(--danger)':'var(--money)';
+}
+$('#txSearch').oninput=renderTx; $('#txFilterPay').onchange=renderTx;
+
+/* ================= PARTNERS ================= */
+function renderPartners(){
+  const q=($('#pSearch').value||'').toLowerCase();
+  const rows=ST.partners.filter(p=>!q||(p.name+' '+p.gst+' '+p.state+' '+p.email+' '+p.phone).toLowerCase().includes(q));
+  const tb=$('#pRows');
+  if(!rows.length){ tb.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="big">No partners yet</div>Add partners or import from Excel.</div></td></tr>`; return; }
+  tb.innerHTML=rows.map(p=>`<tr><td><b>${esc(p.name)}</b></td><td class="num">${esc(p.gst||'—')}</td><td>${esc(p.state||'—')}</td><td>${esc(p.email||'—')}</td><td class="num">${esc(p.phone||'—')}</td><td style="max-width:220px;color:var(--muted);font-size:12px">${esc(p.address||'—')}</td><td><div class="row-actions">${can('edit')?`<button class="btn sm" data-edit="${p.id}">Edit</button><button class="btn sm danger" data-del="${p.id}">Del</button>`:'<span style="color:var(--muted);font-size:12px">view only</span>'}</div></td></tr>`).join('');
+  tb.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>partnerModal(ST.partners.find(x=>x.id===b.dataset.edit)));
+  tb.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{ if(!confirm('Delete this partner?'))return; try{const d=await api('/api/partners/delete','POST',{id:b.dataset.del});ST.partners=d.partners;renderPartners();fillPartnerSelect();toast('Partner deleted.');}catch(e){toast(e.message,1);} });
+}
+$('#pSearch').oninput=renderPartners; $('#pAdd').onclick=()=>partnerModal(null);
+function partnerModal(p){ const e=p||{};
+  openModal(p?'Edit partner':'Add partner',`<div class="grid g2">
+    <div class="field"><label>Name <span class="req">*</span></label><input id="f_name" value="${esc(e.name||'')}"/></div>
+    <div class="field"><label>GST No.</label><input id="f_gst" value="${esc(e.gst||'')}"/></div>
+    <div class="field"><label>State <span class="req">*</span></label><select id="f_state">${STATES.map(s=>`<option ${s===e.state?'selected':''}>${s}</option>`).join('')}</select></div>
+    <div class="field"><label>Phone No.</label><input id="f_phone" value="${esc(e.phone||'')}"/></div>
+    <div class="field"><label>Mail ID</label><input id="f_email" value="${esc(e.email||'')}"/></div>
+    <div class="field" style="grid-column:span 2"><label>Address</label><textarea id="f_address">${esc(e.address||'')}</textarea></div></div>`,
+  async()=>{ const name=$('#f_name').value.trim(); if(!name){toast('Name is required.',1);return false;}
+    const rec={id:e.id,name,gst:$('#f_gst').value.trim(),state:$('#f_state').value,phone:$('#f_phone').value.trim(),email:$('#f_email').value.trim(),address:$('#f_address').value.trim()};
+    try{const d=await api('/api/partners/save','POST',{partner:rec});ST.partners=d.partners;renderPartners();fillPartnerSelect();toast(e.id?'Partner updated.':'Partner added.');}catch(er){toast(er.message,1);return false;} });
+}
+
+/* ================= SERVICES ================= */
+function renderServices(){
+  const q=($('#sSearch').value||'').toLowerCase();
+  const rows=ST.services.filter(s=>!q||(s.name+' '+s.hsn).toLowerCase().includes(q));
+  const tb=$('#sRows');
+  if(!rows.length){ tb.innerHTML=`<tr><td colspan="5"><div class="empty"><div class="big">No services yet</div>Add services or import from Excel.</div></td></tr>`; return; }
+  tb.innerHTML=rows.map(s=>`<tr><td><b>${esc(s.name)}</b></td><td class="num">${esc(s.hsn||'—')}</td><td class="r num">${money(s.rate)}</td><td class="r num">${s.gst!=null&&s.gst!==''?s.gst+'%':'—'}</td><td><div class="row-actions">${can('edit')?`<button class="btn sm" data-edit="${s.id}">Edit</button><button class="btn sm danger" data-del="${s.id}">Del</button>`:'<span style="color:var(--muted);font-size:12px">view only</span>'}</div></td></tr>`).join('');
+  tb.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>serviceModal(ST.services.find(x=>x.id===b.dataset.edit)));
+  tb.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{ if(!confirm('Delete this service?'))return; try{const d=await api('/api/services/delete','POST',{id:b.dataset.del});ST.services=d.services;renderServices();toast('Service deleted.');}catch(e){toast(e.message,1);} });
+}
+$('#sSearch').oninput=renderServices; $('#sAdd').onclick=()=>serviceModal(null);
+function serviceModal(s){ const e=s||{};
+  openModal(s?'Edit service':'Add service',`<div class="grid g2">
+    <div class="field" style="grid-column:span 2"><label>Service Name <span class="req">*</span></label><input id="f_sname" value="${esc(e.name||'')}"/></div>
+    <div class="field"><label>HSN / SAC</label><input id="f_hsn" value="${esc(e.hsn||'')}"/></div>
+    <div class="field"><label>Rate (Taxable Value) <span class="req">*</span></label><input id="f_rate" type="number" step="0.01" value="${e.rate!=null?e.rate:''}"/></div>
+    <div class="field"><label>Default GST %</label><input id="f_gst" type="number" step="0.01" value="${e.gst!=null&&e.gst!==''?e.gst:18}"/></div></div>`,
+  async()=>{ const name=$('#f_sname').value.trim(); if(!name){toast('Service name is required.',1);return false;} const rate=parseFloat($('#f_rate').value); if(isNaN(rate)){toast('Rate is required.',1);return false;}
+    const rec={id:e.id,name,hsn:$('#f_hsn').value.trim(),rate,gst:parseFloat($('#f_gst').value)||0};
+    try{const d=await api('/api/services/save','POST',{service:rec});ST.services=d.services;renderServices();toast(e.id?'Service updated.':'Service added.');}catch(er){toast(er.message,1);return false;} });
+}
+
+/* ================= USERS ================= */
+function renderUsers(){
+  const tb=$('#uRows'); if(!tb) return;
+  tb.innerHTML=ST.users.map(u=>{ const r=u.rights||{};
+    const tags=r.admin?'<span class="role-tag role-admin">Admin</span>':['<span class="role-tag role-view">View</span>',r.edit?'<span class="role-tag role-edit">Edit</span>':'',r.export?'<span class="role-tag role-export">Export</span>':''].filter(Boolean).join(' ');
+    const self=currentUser&&currentUser.id===u.id;
+    return `<tr><td><b>${esc(u.username)}</b>${self?' <span style="font-size:11px;color:var(--muted)">(you)</span>':''}</td><td>${esc(u.name||'—')}</td><td>${tags}</td><td><div class="row-actions"><button class="btn sm" data-edit="${u.id}">Edit</button><button class="btn sm danger" data-del="${u.id}" ${self?'disabled':''}>Del</button></div></td></tr>`;
+  }).join('');
+  tb.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>userModal(ST.users.find(x=>x.id===b.dataset.edit)));
+  tb.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{ if(b.disabled)return; const u=ST.users.find(x=>x.id===b.dataset.del); if(!confirm('Delete user "'+u.username+'"?'))return; try{const d=await api('/api/users/delete','POST',{id:b.dataset.del});ST.users=d.users;renderUsers();toast('User deleted.');}catch(e){toast(e.message,1);} });
+}
+$('#uAdd').onclick=()=>userModal(null);
+function userModal(u){ const e=u||{}, r=e.rights||{};
+  openModal(u?'Edit user':'Add user',`<div class="grid g2">
+    <div class="field"><label>Username <span class="req">*</span></label><input id="u_username" value="${esc(e.username||'')}" ${u?'readonly':''}/></div>
+    <div class="field"><label>Full name</label><input id="u_name" value="${esc(e.name||'')}"/></div>
+    <div class="field" style="grid-column:span 2"><label>${u?'New password (leave blank to keep current)':'Password <span class="req">*</span>'}</label><input id="u_pass" type="text" placeholder="${u?'••••••':'Set a password'}"/></div></div>
+    <div class="divider"></div><label style="font-size:11.5px;font-weight:600;color:var(--muted)">Rights</label>
+    <div style="margin-top:10px;display:flex;flex-direction:column;gap:10px">
+      <label style="display:flex;gap:9px;font-size:13.5px"><input type="checkbox" id="u_admin" ${r.admin?'checked':''}/> <span><b>Admin</b> — full access including managing users.</span></label>
+      <label style="display:flex;gap:9px;font-size:13.5px"><input type="checkbox" id="u_edit" ${r.edit?'checked':''}/> <span><b>Edit</b> — create receipts, manage partners/services, import.</span></label>
+      <label style="display:flex;gap:9px;font-size:13.5px"><input type="checkbox" id="u_export" ${r.export?'checked':''}/> <span><b>Export</b> — download Excel exports.</span></label>
+      <div style="font-size:12px;color:var(--muted)">Everyone can view all tabs and print. Uncheck all for view-only.</div></div>`,
+  async()=>{ const un=$('#u_username').value.trim(); if(!un){toast('Username required.',1);return false;}
+    const payload={id:e.id,username:un,name:$('#u_name').value.trim(),password:$('#u_pass').value,admin:$('#u_admin').checked,edit:$('#u_edit').checked,export:$('#u_export').checked};
+    try{const d=await api('/api/users/save','POST',{user:payload});ST.users=d.users;renderUsers();toast(e.id?'User updated.':'User added.');}catch(er){toast(er.message,1);return false;} });
+}
+
+/* ================= SETTINGS ================= */
+function fillOrgForm(){ const o=ST.org||{}; $('#orgState').innerHTML=STATES.map(s=>`<option ${s===o.state?'selected':''}>${s}</option>`).join(''); $('#orgName').value=o.name||'';$('#orgGst').value=o.gst||'';$('#orgPhone').value=o.phone||'';$('#orgEmail').value=o.email||'';$('#orgPrefix').value=o.prefix||'RCPT';$('#orgAddress').value=o.address||'';$('#orgFooter').value=o.footer||''; }
+$('#saveOrg').onclick=async()=>{
+  const o={name:$('#orgName').value.trim()||'Your Organization',gst:$('#orgGst').value.trim(),state:$('#orgState').value,phone:$('#orgPhone').value.trim(),email:$('#orgEmail').value.trim(),prefix:$('#orgPrefix').value.trim()||'RCPT',address:$('#orgAddress').value.trim(),footer:$('#orgFooter').value.trim()};
+  try{const d=await api('/api/org/save','POST',{org:o});ST.org=d.org;paintOrgHeader();refreshReceiptNo();recalc();toast('Organization saved.');}catch(e){toast(e.message,1);}
+};
+function paintOrgHeader(){ const o=ST.org||{}; $('#orgQuick').innerHTML=`<b>${esc(o.name||'')}</b><br>${esc(o.state||'')}${o.gst?' · '+esc(o.gst):''}`; }
+
+/* ================= EXCEL ================= */
+function ensureXLSX(){ if(typeof XLSX==='undefined'){toast('Excel library not loaded (needs internet once).',1);return false;} return true; }
+function exportSheet(rows,sheet,file){ if(!can('export')){toast('You do not have export rights.',1);return;} if(!ensureXLSX())return; const ws=XLSX.utils.json_to_sheet(rows);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,sheet);XLSX.writeFile(wb,file);toast('Downloaded '+file); }
+$('#pExport').onclick=()=>exportSheet(ST.partners.map(p=>({Name:p.name,Address:p.address,'GST No.':p.gst,State:p.state,'Mail ID':p.email,'Phone No.':p.phone})),'Partners','Partner_Database.xlsx');
+$('#sExport').onclick=()=>exportSheet(ST.services.map(s=>({'Service Name':s.name,'HSN':s.hsn,'Rate (Taxable Value)':s.rate,'Default GST %':s.gst})),'Services','Service_Rate_List.xlsx');
+$('#txExport').onclick=()=>{ if(!ST.transactions.length){toast('No transactions to export.',1);return;} exportSheet(ST.transactions.map(r=>({'Receipt No.':r.no,Date:r.date,Partner:r.partner.name,'Partner State':r.partner.state,'Partner GST':r.partner.gst,Students:r.students.join('; '),Services:r.items.map(i=>`${i.name} (x${i.qty})`).join('; '),'Taxable Value':r.totals.taxable,CGST:r.totals.cgst,SGST:r.totals.sgst,IGST:r.totals.igst,'GST Type':r.gstType,'Grand Total':r.totals.grand,'Paid Amount':(r.totals.paid!=null?r.totals.paid:r.totals.grand),'Balance Amount':(r.totals.balance!=null?r.totals.balance:0),'Payment Method':r.payment.method,'Ref / Txn No.':r.payment.ref,Bank:r.payment.bank,'Prepaid By':r.payment.prepaidBy||'',Note:r.note||'','Created By':r.createdBy||''})),'Transactions','Transaction_Database.xlsx'); };
+
+const pick=(row,keys)=>{for(const k of keys)for(const rk of Object.keys(row))if(rk.trim().toLowerCase()===k.toLowerCase())return row[rk];return '';};
+function readWorkbook(file,cb){ if(!ensureXLSX())return; const rd=new FileReader(); rd.onload=e=>{try{const wb=XLSX.read(e.target.result,{type:'array'});cb(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''}));}catch(err){toast('Could not read file: '+err.message,1);}}; rd.readAsArrayBuffer(file); }
+$('#pImport').onclick=()=>{ if(!can('edit')){toast('You do not have edit rights.',1);return;} $('#pFile').click(); };
+$('#pFile').onchange=e=>{ const f=e.target.files[0]; if(!f)return; readWorkbook(f,async rows=>{ const list=rows.map(r=>({name:String(pick(r,['Name','Partner Name','Partner'])).trim(),address:String(pick(r,['Address'])).trim(),gst:String(pick(r,['GST No.','GST','GSTIN'])).trim(),state:String(pick(r,['State'])).trim(),email:String(pick(r,['Mail ID','Email','E-mail'])).trim(),phone:String(pick(r,['Phone No.','Phone','Mobile'])).trim()})).filter(x=>x.name); try{const d=await api('/api/import','POST',{kind:'partners',rows:list});ST.partners=d.partners;renderPartners();fillPartnerSelect();toast(d.imported+' partner(s) imported.');}catch(er){toast(er.message,1);} }); e.target.value=''; };
+$('#sImport').onclick=()=>{ if(!can('edit')){toast('You do not have edit rights.',1);return;} $('#sFile').click(); };
+$('#sFile').onchange=e=>{ const f=e.target.files[0]; if(!f)return; readWorkbook(f,async rows=>{ const list=rows.map(r=>{const g=pick(r,['Default GST %','GST %','GST','GST Rate']);return {name:String(pick(r,['Service Name','Service','Name'])).trim(),hsn:String(pick(r,['HSN','HSN/SAC','SAC'])).trim(),rate:parseFloat(pick(r,['Rate (Taxable Value)','Rate','Taxable Value','Amount']))||0,gst:g===''?18:parseFloat(g)||0};}).filter(x=>x.name); try{const d=await api('/api/import','POST',{kind:'services',rows:list});ST.services=d.services;renderServices();toast(d.imported+' service(s) imported.');}catch(er){toast(er.message,1);} }); e.target.value=''; };
+
+/* ================= BOOT ================= */
+(async function(){
+  try{ const s=await api('/api/session'); currentUser=s.user; $('#login').classList.add('hidden'); applyPermissions(); await refreshState(); resetReceiptForm(); }
+  catch(e){ let hint=false; try{const c=await fetch('/api/session',{credentials:'same-origin'});}catch{} showLogin(true); }
+})();
+</script>
+</body>
+</html>
