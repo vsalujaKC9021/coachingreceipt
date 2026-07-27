@@ -20,22 +20,33 @@ let db = null;
 function freshDb() {
   return {
     org: { name: 'Your Organization', gst: '', state: 'Maharashtra', phone: '', email: '',
-           address: '', prefix: 'RCPT', footer: 'This is a computer generated receipt.' },
+           address: '', prefix: 'RCPT', footer: 'This is a computer generated receipt.', logo: '', additionalFields: [] },
     partners: [], services: [], transactions: [], users: [], seq: 0
   };
 }
 function hashPw(password, salt) {
   return crypto.scryptSync(password, salt, 64).toString('hex');
 }
+const TAB_KEYS = ['receipt', 'transactions', 'partners', 'services', 'settings', 'reconciliation', 'users'];
+function normalizeRights(rights) {
+  const r = Object.assign({ admin: false, edit: false, export: false }, rights || {});
+  const legacyTabs = {}; TAB_KEYS.forEach(k => legacyTabs[k] = true);
+  r.tabs = Object.assign(legacyTabs, r.tabs || {});
+  if (r.admin) TAB_KEYS.forEach(k => r.tabs[k] = true);
+  return r;
+}
 function makeUser(username, name, password, rights) {
   const salt = crypto.randomBytes(16).toString('hex');
-  return { id: uid(), username, name: name || username, salt, hash: hashPw(password, salt), rights };
+  return { id: uid(), username, name: name || username, salt, hash: hashPw(password, salt), rights: normalizeRights(rights) };
 }
 function loadDb() {
   try {
     db = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
     if (!db.users) db.users = [];
     if (!db.org) db.org = freshDb().org;
+    db.org = Object.assign(freshDb().org, db.org);
+    if (!Array.isArray(db.org.additionalFields)) db.org.additionalFields = [];
+    db.users.forEach(u => u.rights = normalizeRights(u.rights));
   } catch (e) {
     db = freshDb();
   }
@@ -78,9 +89,11 @@ function sessionTokenFrom(req) {
 }
 
 /* ---------------- Helpers ---------------- */
-function sanitizeUser(u) { return { id: u.id, username: u.username, name: u.name, rights: u.rights }; }
+function sanitizeUser(u) { return { id: u.id, username: u.username, name: u.name, rights: normalizeRights(u.rights) }; }
 function can(user, perm) {
   if (!user) return false;
+  user.rights = normalizeRights(user.rights);
+  if (perm.startsWith('tab:')) return !!(user.rights.admin || user.rights.tabs[perm.slice(4)]);
   if (perm === 'view') return true;
   return !!(user.rights && user.rights[perm]);
 }
@@ -140,16 +153,17 @@ async function api(req, res, url) {
   const body = (req.method === 'POST') ? await readBody(req) : {};
   const needEdit = () => { if (!can(user, 'edit')) { send(res, 403, { error: 'You do not have edit rights.' }); return false; } return true; };
   const needAdmin = () => { if (!can(user, 'admin')) { send(res, 403, { error: 'You do not have admin rights.' }); return false; } return true; };
+  const needTab = (tab) => { if (!can(user, 'tab:' + tab)) { send(res, 403, { error: 'You do not have access to this tab.' }); return false; } return true; };
 
   if (p === '/api/org/save' && req.method === 'POST') {
-    if (!needEdit()) return;
+    if (!needTab('settings') || !needEdit()) return;
     const seq = db.org.seq; // preserve nothing; seq lives at db level
     db.org = Object.assign({}, db.org, body.org || {});
     saveDb(); return send(res, 200, { org: db.org });
   }
 
   if (p === '/api/partners/save' && req.method === 'POST') {
-    if (!needEdit()) return;
+    if (!needTab('partners') || !needEdit()) return;
     const pt = body.partner || {};
     if (!pt.name) return send(res, 400, { error: 'Name required' });
     if (pt.id) { db.partners = db.partners.map(x => x.id === pt.id ? Object.assign(x, pt) : x); }
@@ -157,13 +171,13 @@ async function api(req, res, url) {
     saveDb(); return send(res, 200, { partners: db.partners });
   }
   if (p === '/api/partners/delete' && req.method === 'POST') {
-    if (!needEdit()) return;
+    if (!needTab('partners') || !needEdit()) return;
     db.partners = db.partners.filter(x => x.id !== body.id); saveDb();
     return send(res, 200, { partners: db.partners });
   }
 
   if (p === '/api/services/save' && req.method === 'POST') {
-    if (!needEdit()) return;
+    if (!needTab('services') || !needEdit()) return;
     const s = body.service || {};
     if (!s.name) return send(res, 400, { error: 'Name required' });
     if (s.id) { db.services = db.services.map(x => x.id === s.id ? Object.assign(x, s) : x); }
@@ -171,13 +185,14 @@ async function api(req, res, url) {
     saveDb(); return send(res, 200, { services: db.services });
   }
   if (p === '/api/services/delete' && req.method === 'POST') {
-    if (!needEdit()) return;
+    if (!needTab('services') || !needEdit()) return;
     db.services = db.services.filter(x => x.id !== body.id); saveDb();
     return send(res, 200, { services: db.services });
   }
 
   if (p === '/api/import' && req.method === 'POST') {
-    if (!needEdit()) return;
+    const importTab = body.kind === 'partners' ? 'partners' : body.kind === 'services' ? 'services' : '';
+    if (!importTab || !needTab(importTab) || !needEdit()) return;
     let n = 0;
     if (body.kind === 'partners' && Array.isArray(body.rows)) {
       body.rows.forEach(r => { if (r.name) { r.id = uid(); db.partners.push(r); n++; } });
@@ -188,23 +203,24 @@ async function api(req, res, url) {
   }
 
   if (p === '/api/transactions/create' && req.method === 'POST') {
-    if (!needEdit()) return;
+    if (!needTab('receipt') || !needEdit()) return;
     const r = body.receipt || {};
     db.seq = (db.seq || 0) + 1;                      // server assigns the receipt number
     r.seq = db.seq;
     r.no = `${(db.org.prefix || 'RCPT')}-${String(db.seq).padStart(4, '0')}`;
     r.id = uid();
     r.createdAt = new Date().toISOString();
-    r.createdBy = user.username;
+    r.createdBy = user.name || user.username;
     db.transactions.unshift(r);
     saveDb(); return send(res, 200, { receipt: r, transactions: db.transactions });
   }
   if (p === '/api/transactions/delete' && req.method === 'POST') {
-    if (!needEdit()) return;
+    if (!needTab('transactions') || !needEdit()) return;
     db.transactions = db.transactions.filter(x => x.id !== body.id); saveDb();
     return send(res, 200, { transactions: db.transactions });
   }
   if (p === '/api/nextno' && req.method === 'GET') {
+    if (!needTab('receipt')) return;
     const seq = (db.seq || 0) + 1;
     return send(res, 200, { no: `${(db.org.prefix || 'RCPT')}-${String(seq).padStart(4, '0')}` });
   }
@@ -213,7 +229,7 @@ async function api(req, res, url) {
   if (p === '/api/users/save' && req.method === 'POST') {
     if (!needAdmin()) return;
     const uIn = body.user || {};
-    const rights = { admin: !!uIn.admin, edit: uIn.admin ? true : !!uIn.edit, export: uIn.admin ? true : !!uIn.export };
+    const rights = normalizeRights({ admin: !!uIn.admin, edit: uIn.admin ? true : !!uIn.edit, export: uIn.admin ? true : !!uIn.export, tabs: uIn.tabs || {} });
     if (uIn.id) {
       const ex = db.users.find(x => x.id === uIn.id);
       if (!ex) return send(res, 404, { error: 'not found' });

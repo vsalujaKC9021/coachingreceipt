@@ -18,15 +18,6 @@
       "email": "abcdedutech@gmail.com",
       "address": "Block No. 220, PST Square,Andhra Pradeh.",
       "id": "mrvnyw7e27d42309"
-    },
-    {
-      "name": "PQRST LTD,",
-      "gst": "27ASDFG7589Q1ZA",
-      "state": "Maharashtra",
-      "phone": "789456123",
-      "email": "PQRST@gmail.com",
-      "address": "Plot No. 223, Kharsa No.12, Nagpur",
-      "id": "mrw2o4sab41ab8da"
     }
   ],
   "services": [
@@ -36,67 +27,9 @@
       "rate": 15000,
       "gst": 18,
       "id": "mrvnzj4a01c37238"
-    },
-    {
-      "name": "IETS",
-      "hsn": "998999",
-      "rate": 15000,
-      "gst": 18,
-      "id": "mrw27u3f198f5388"
     }
   ],
   "transactions": [
-    {
-      "date": "2026-07-22",
-      "partner": {
-        "name": "PQRST LTD,",
-        "gst": "27ASDFG7589Q1ZA",
-        "state": "Maharashtra",
-        "address": "Plot No. 223, Kharsa No.12, Nagpur",
-        "email": "PQRST@gmail.com",
-        "phone": "789456123"
-      },
-      "partnerId": "mrw2o4sab41ab8da",
-      "students": [
-        "Pinky Sharma"
-      ],
-      "items": [
-        {
-          "name": "IETS",
-          "hsn": "998999",
-          "rate": 15000,
-          "qty": 1,
-          "gst": 18,
-          "taxable": 15000,
-          "cgst": 1350,
-          "sgst": 1350,
-          "igst": 0,
-          "amount": 17700
-        }
-      ],
-      "gstType": "CGST+SGST",
-      "payment": {
-        "method": "Bank Transfer",
-        "ref": "56471",
-        "bank": "ICICI Bank",
-        "prepaidBy": "Vishal Saluja"
-      },
-      "totals": {
-        "taxable": 15000,
-        "cgst": 1350,
-        "sgst": 1350,
-        "igst": 0,
-        "grand": 17700,
-        "paid": 15000,
-        "balance": 2700
-      },
-      "note": "",
-      "seq": 2,
-      "no": "RCPT-0002",
-      "id": "mrw2pcrc52160ac4",
-      "createdAt": "2026-07-22T12:43:12.984Z",
-      "createdBy": "admin"
-    },
     {
       "date": "2026-07-22",
       "partner": {
@@ -163,5 +96,5 @@
       }
     }
   ],
-  "seq": 2
+  "seq": 1
 }
