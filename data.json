@@ -26,7 +26,8 @@
       "hsn": "998999",
       "rate": 15000,
       "gst": 18,
-      "id": "mrvnzj4a01c37238"
+      "id": "mrvnzj4a01c37238",
+      "grossRate": 17700
     }
   ],
   "transactions": [
@@ -87,13 +88,14 @@
       "id": "mrvmnulk7aa7f2af",
       "username": "admin",
       "name": "Administrator",
-      "salt": "220911821795beccd31c0e3ec6f198fa",
-      "hash": "3a78baf981b08cfb7b9d6ff08a133a0808cfcb5514deb2fa432e9a0e6185e41f3a4b31bbf15a30f9ded0c4b46be2f06cfb6b199b3b220686de32f3ee5afedaca",
+      "salt": "3f5844e12175f29b5261ce7cfd056cf5",
+      "hash": "99161c737000e1d4567068829a37692d2d17941a4f9bfa59af761e79b03461f6984c173d1e321a800049535138883060d69120c4cb6944851e4e3f5d13ba51a8",
       "rights": {
         "admin": true,
         "edit": true,
         "export": true
-      }
+      },
+      "email": ""
     }
   ],
   "seq": 1

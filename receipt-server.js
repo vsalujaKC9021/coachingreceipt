@@ -35,9 +35,9 @@ function normalizeRights(rights) {
   if (r.admin) TAB_KEYS.forEach(k => r.tabs[k] = true);
   return r;
 }
-function makeUser(username, name, password, rights) {
+function makeUser(username, name, password, rights, email) {
   const salt = crypto.randomBytes(16).toString('hex');
-  return { id: uid(), username, name: name || username, salt, hash: hashPw(password, salt), rights: normalizeRights(rights) };
+  return { id: uid(), username, name: name || username, email: (email || '').trim(), salt, hash: hashPw(password, salt), rights: normalizeRights(rights) };
 }
 function loadDb() {
   try {
@@ -89,7 +89,7 @@ function sessionTokenFrom(req) {
 }
 
 /* ---------------- Helpers ---------------- */
-function sanitizeUser(u) { return { id: u.id, username: u.username, name: u.name, rights: normalizeRights(u.rights) }; }
+function sanitizeUser(u) { return { id: u.id, username: u.username, name: u.name, email: u.email || '', rights: normalizeRights(u.rights) }; }
 function can(user, perm) {
   if (!user) return false;
   user.rights = normalizeRights(user.rights);
@@ -118,7 +118,8 @@ async function api(req, res, url) {
   // ---- Auth ----
   if (p === '/api/login' && req.method === 'POST') {
     const { username, password } = await readBody(req);
-    const u = db.users.find(x => x.username.toLowerCase() === String(username || '').trim().toLowerCase());
+    const key = String(username || '').trim().toLowerCase();
+    const u = db.users.find(x => x.username.toLowerCase() === key || ((x.email || '').toLowerCase() === key && key !== ''));
     const ok = u && crypto.timingSafeEqual(Buffer.from(u.hash, 'hex'), Buffer.from(hashPw(String(password || ''), u.salt), 'hex'));
     if (!ok) return send(res, 401, { error: 'Incorrect username or password.' });
     const token = newSession(u.id);
@@ -230,19 +231,25 @@ async function api(req, res, url) {
     if (!needAdmin()) return;
     const uIn = body.user || {};
     const rights = normalizeRights({ admin: !!uIn.admin, edit: uIn.admin ? true : !!uIn.edit, export: uIn.admin ? true : !!uIn.export, tabs: uIn.tabs || {} });
+    const email = (uIn.email || '').trim();
     if (uIn.id) {
       const ex = db.users.find(x => x.id === uIn.id);
       if (!ex) return send(res, 404, { error: 'not found' });
       if (ex.rights.admin && !rights.admin && db.users.filter(x => x.rights.admin).length <= 1)
         return send(res, 400, { error: 'At least one admin is required.' });
-      ex.name = uIn.name || ex.name; ex.rights = rights;
+      if (email && db.users.some(x => x.id !== ex.id &&
+          ((x.email || '').toLowerCase() === email.toLowerCase() || x.username.toLowerCase() === email.toLowerCase())))
+        return send(res, 400, { error: 'That email is already used as a login by another user.' });
+      ex.name = uIn.name || ex.name; ex.email = email; ex.rights = rights;
       if (uIn.password) { ex.salt = crypto.randomBytes(16).toString('hex'); ex.hash = hashPw(uIn.password, ex.salt); }
     } else {
       if (!uIn.username) return send(res, 400, { error: 'Username required' });
       if (db.users.some(x => x.username.toLowerCase() === uIn.username.toLowerCase()))
         return send(res, 400, { error: 'Username already exists.' });
+      if (email && db.users.some(x => (x.email || '').toLowerCase() === email.toLowerCase() || x.username.toLowerCase() === email.toLowerCase()))
+        return send(res, 400, { error: 'That email is already used as a login by another user.' });
       if (!uIn.password) return send(res, 400, { error: 'Password required for new user.' });
-      db.users.push(makeUser(uIn.username.trim(), uIn.name, uIn.password, rights));
+      db.users.push(makeUser(uIn.username.trim(), uIn.name, uIn.password, rights, email));
     }
     saveDb(); return send(res, 200, { users: db.users.map(sanitizeUser) });
   }

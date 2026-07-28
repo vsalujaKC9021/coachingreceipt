@@ -161,3 +161,53 @@ the in-app Excel exports for human-readable copies.
 
 Enjoy — and if you later want features like editable "record a payment against a balance",
 audit logs of who changed what, or emailing receipts, those are natural next steps.
+
+---
+
+## 9. Latest changes (this update)
+
+**1. New Receipt — "Rate (Incl. GST)" column removed.**
+The per-service inclusive-rate column no longer appears on the New Receipt screen. Amounts
+are still derived by the backward method from the Paid Amount (inclusive of GST) and
+apportioned across services by their inclusive rate, exactly as before — the column was
+only display clutter and has been taken out.
+
+**2. Searchable partner filter (type-ahead).**
+The partner selector on New Receipt and the associate filter on the Reconciliation tab are
+now search boxes. Type **3 or more letters** to get a live, filtered list of matching
+partners and click one to select it (you can also click the empty box to browse all). This
+replaces the long single dropdown and makes large partner lists easy to use.
+
+**3. Email ID can be used to sign in.**
+Each user can now have an **Email ID** (set in the Users tab). A user can log in with
+**either** their username **or** their email — both work with the same password. The login
+screen field is labelled "Username or Email". Emails must be unique across users. Existing
+users keep working unchanged (their email is simply blank until you add one).
+
+**4. Reconciliation with linked part-payments + "Ref. Receipt No." on New Receipt.**
+You can now record a later payment against an earlier receipt's outstanding balance:
+
+- **New Receipt** has an optional **"Ref. Receipt No."** field. Start typing a receipt
+  number or a student's name to find and link the earlier receipt. When linked, the app
+  shows that receipt's students, its list-price Gross, how much has been received so far,
+  and the remaining Pending — and auto-selects the same associate.
+- **Reconciliation Statement** now groups each original ("primary") receipt with all of its
+  linked follow-up payments. For each primary receipt it shows **Gross (Incl. GST)**,
+  **Received (incl. linked)** = the original receipt amount plus every linked payment, and
+  **Pending** = Gross − Received. Linked follow-up receipts appear as indented sub-rows
+  beneath their parent and are **never** counted as their own gross line, so nothing is
+  double-counted. Excel and PDF exports reflect the same structure (with a "Linked payments"
+  column and totals row).
+
+  *Worked example:* RCPT-0005 has a Gross of ₹17,700 and receives ₹15,000 — Pending ₹2,700.
+  A few days later RCPT-0015 is created with **Ref. Receipt No. = RCPT-0005** for ₹2,000.
+  Reconciliation then shows RCPT-0005 with Received ₹17,000 and Pending ₹700, with RCPT-0015
+  listed underneath as a linked payment.
+
+> Note on older receipts: receipts created before this update simply have no linked payments
+> and no "Ref. Receipt No." — they display correctly as standalone primary rows, and their
+> Gross is computed from the current Service Rate list if an inclusive rate wasn't stored.
+
+**Login reminder:** the admin password in the bundled `data.json` has been reset to
+**admin / admin** for this handover. Please change it in the Users tab after signing in.
+
