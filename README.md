@@ -229,3 +229,9 @@ the top-left, beside the organization name. To change the logo in future, send t
 and it can be swapped in (it lives as a single `ORG_LOGO` value near the top of
 `public/index.html`).
 
+**7. Additional fields now print in the organization header.**
+The custom label/value pairs you add under **Settings → Additional receipt fields**
+(e.g. Website, CIN No.) now appear in the organization block at the top of the receipt,
+directly **below the phone number**, instead of in a separate box beside the students.
+This applies to the print preview and the printed / PDF receipt.
+

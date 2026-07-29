@@ -12,7 +12,11 @@ const crypto = require('crypto');
 
 const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
-const DATA_FILE = path.join(ROOT, 'data.json');
+const SEED_FILE = path.join(ROOT, 'data.json');
+// On hosts like Render, set DATA_FILE to a path on a persistent disk (e.g.
+// /data/data.json) so data survives restarts and redeploys. If unset, data is
+// stored next to this file (fine locally; NOT persistent on Render's free tier).
+const DATA_FILE = process.env.DATA_FILE || SEED_FILE;
 const PUBLIC = path.join(ROOT, 'public');
 
 /* ---------------- Data store ---------------- */
@@ -41,6 +45,12 @@ function makeUser(username, name, password, rights, email) {
 }
 function loadDb() {
   try {
+    // First boot on a persistent disk: copy the bundled seed data across.
+    if (DATA_FILE !== SEED_FILE && !fs.existsSync(DATA_FILE) && fs.existsSync(SEED_FILE)) {
+      try { fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true }); } catch (e) {}
+      fs.copyFileSync(SEED_FILE, DATA_FILE);
+      console.log('>> Seeded data file at ' + DATA_FILE + ' from bundled data.json');
+    }
     db = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
     if (!db.users) db.users = [];
     if (!db.org) db.org = freshDb().org;
