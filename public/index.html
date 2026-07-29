@@ -34,6 +34,7 @@
   body.no-edit .requires-edit{display:none !important}
   body.no-export .requires-export{display:none !important}
   body.no-admin .tab-admin{display:none !important}
+  body.no-admin .requires-admin{display:none !important}
   main{max-width:1180px;margin:0 auto;padding:22px 22px 80px}
   .panel{display:none}.panel.active{display:block;animation:fade .18s ease}
   @keyframes fade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
@@ -289,6 +290,14 @@
       <div id="orgExtraFields"></div><button class="btn sm requires-edit" id="addOrgField">+ Add field</button>
       <div class="divider"></div>
       <button class="btn primary requires-edit" id="saveOrg">Save organization</button>
+    </div>
+    <div class="card requires-admin"><h3>Receipt numbering <span class="tag">admin only</span></h3>
+      <p class="hint" style="margin:0 0 12px">Receipt numbers are issued automatically by the server using the prefix set above. Reset the counter here so the next receipt starts from a number you choose. Existing receipts are not changed, and any number already used is skipped automatically so numbers never repeat.</p>
+      <div class="grid g2">
+        <div class="field"><label>Next receipt number</label><input id="seqNext" type="number" min="1" step="1" placeholder="e.g. 1" /><div class="hint">Whole number for the next receipt &nbsp;→&nbsp; <b id="seqPreviewNo">…</b></div></div>
+        <div class="field" style="align-self:start"><label>&nbsp;</label><button class="btn primary requires-admin" id="resetSeq">Reset receipt number</button></div>
+      </div>
+      <div id="seqInfo" class="gst-note" style="margin-top:10px"></div>
     </div>
   </section>
 
@@ -708,7 +717,19 @@ function readLogo(file){return new Promise((resolve,reject)=>{if(!file)return re
 $('#saveOrg').onclick=async()=>{try{const fields=$$('.org-x-label').map((x,i)=>({label:x.value.trim(),value:$$('.org-x-value')[i].value.trim()})).filter(x=>x.label);const logo=await readLogo($('#orgLogo').files[0]);const o={name:$('#orgName').value.trim()||'Your Organization',gst:$('#orgGst').value.trim(),state:$('#orgState').value,phone:$('#orgPhone').value.trim(),email:$('#orgEmail').value.trim(),prefix:$('#orgPrefix').value.trim()||'RCPT',address:$('#orgAddress').value.trim(),footer:$('#orgFooter').value.trim(),logo,additionalFields:fields};const d=await api('/api/org/save','POST',{org:o});ST.org=d.org;renderOrgExtras();paintOrgHeader();refreshReceiptNo();recalc();toast('Organization saved.');}catch(e){toast(e.message,1);}};
 function renderServices(){const q=($('#sSearch').value||'').toLowerCase(),rows=ST.services.filter(s=>!q||(s.name+' '+s.hsn).toLowerCase().includes(q)),tb=$('#sRows');tb.innerHTML=rows.length?rows.map(s=>{const gross=Number(s.grossRate!=null?s.grossRate:(Number(s.rate)||0)*(1+(Number(s.gst)||0)/100));return `<tr><td><b>${esc(s.name)}</b></td><td>${esc(s.hsn||'—')}</td><td class="r num">${money(s.rate)}</td><td class="r num">${s.gst||0}%</td><td class="r num"><b>${money(gross)}</b></td><td><div class="row-actions">${can('edit')?`<button class="btn sm" data-edit="${s.id}">Edit</button><button class="btn sm danger" data-del="${s.id}">Del</button>`:'view only'}</div></td></tr>`;}).join(''):`<tr><td colspan="6"><div class="empty">No services yet.</div></td></tr>`;tb.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>serviceModal(ST.services.find(x=>x.id===b.dataset.edit)));tb.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{try{const d=await api('/api/services/delete','POST',{id:b.dataset.del});ST.services=d.services;renderServices();}catch(e){toast(e.message,1);}});}
 function serviceModal(s){const e=s||{};openModal(s?'Edit service':'Add service',`<div class="grid g2"><div class="field" style="grid-column:span 2"><label>Service Name *</label><input id="f_sname" value="${esc(e.name||'')}"></div><div class="field"><label>HSN / SAC</label><input id="f_hsn" value="${esc(e.hsn||'')}"></div><div class="field"><label>Rate (Taxable Value) *</label><input id="f_rate" type="number" step="0.01" value="${e.rate!=null?e.rate:''}"></div><div class="field"><label>Default GST %</label><input id="f_gst" type="number" step="0.01" value="${e.gst!=null?e.gst:18}"></div><div class="field"><label>Rate (Inclusive of GST)</label><input id="f_gross" readonly></div></div>`,async()=>{const rate=parseFloat($('#f_rate').value),gst=parseFloat($('#f_gst').value)||0,name=$('#f_sname').value.trim();if(!name||isNaN(rate)){toast('Service name and taxable rate are required.',1);return false;}const rec={id:e.id,name,hsn:$('#f_hsn').value.trim(),rate,gst,grossRate:+(rate*(1+gst/100)).toFixed(2)};try{const d=await api('/api/services/save','POST',{service:rec});ST.services=d.services;renderServices();return true;}catch(er){toast(er.message,1);return false;}});const update=()=>$('#f_gross').value=money((parseFloat($('#f_rate').value)||0)*(1+(parseFloat($('#f_gst').value)||0)/100));$('#f_rate').oninput=update;$('#f_gst').oninput=update;update();}
-function renderAll(){paintOrgHeader();fillOrgForm();fillPartnerSelect();renderPartners();renderServices();renderUsers();txFilterPayOptions();renderTx();fillReconPartners();renderRecon();recalc();}
+function seqPreview(){ const n=Math.max(1,parseInt($('#seqNext').value)||1); const prefix=(ST.org&&ST.org.prefix)||'RCPT'; $('#seqPreviewNo').textContent=prefix+'-'+String(n).padStart(4,'0'); }
+async function renderSeqInfo(){ const el=$('#seqInfo'); if(!el) return; try{ const d=await api('/api/nextno'); el.innerHTML=`Right now the next receipt will be <b>${esc(d.no)}</b>.`; }catch{ el.textContent=''; } if($('#seqNext')&&!$('#seqNext').value) seqPreview(); }
+if($('#seqNext')) $('#seqNext').oninput=seqPreview;
+if($('#resetSeq')) $('#resetSeq').onclick=async()=>{
+  if(!can('admin')){ toast('Only admins can reset the receipt number.',1); return; }
+  const n=parseInt($('#seqNext').value); if(!n||n<1){ toast('Enter a whole number of 1 or more.',1); return; }
+  const prefix=(ST.org&&ST.org.prefix)||'RCPT'; const preview=prefix+'-'+String(n).padStart(4,'0');
+  const highest=ST.transactions.reduce((m,t)=>Math.max(m,Number(t.seq)||0),0);
+  let msg='Set the next receipt number to '+preview+'?'; if(n<=highest) msg+='\n\nReceipts up to '+prefix+'-'+String(highest).padStart(4,'0')+' already exist. Any number already used will be skipped automatically so numbers never repeat.';
+  if(!confirm(msg)) return;
+  try{ const d=await api('/api/settings/resetseq','POST',{next:n}); $('#seqNext').value=''; await renderSeqInfo(); refreshReceiptNo(); toast('Done — the next receipt will be '+d.no+'.'); }catch(e){ toast(e.message,1); }
+};
+function renderAll(){paintOrgHeader();fillOrgForm();fillPartnerSelect();renderPartners();renderServices();renderUsers();txFilterPayOptions();renderTx();fillReconPartners();renderRecon();renderSeqInfo();recalc();}
 makeCombo('rcpPartnerSearch','rcpPartner','rcpPartnerList',
   ()=>ST.partners.map(p=>({id:p.id,label:p.name,search:(p.name+' '+(p.state||'')+' '+(p.gst||'')).toLowerCase(),html:esc(p.name)+' <small>'+esc(p.state||'')+'</small>'})),
   ()=>{ recalc(); });
