@@ -206,9 +206,15 @@ async function api(req, res, url) {
   if (p === '/api/transactions/create' && req.method === 'POST') {
     if (!needTab('receipt') || !needEdit()) return;
     const r = body.receipt || {};
+    const prefix = db.org.prefix || 'RCPT';
     db.seq = (db.seq || 0) + 1;                      // server assigns the receipt number
+    let no = `${prefix}-${String(db.seq).padStart(4, '0')}`;
+    while (db.transactions.some(t => t.no === no)) {  // never reuse a number (e.g. after a reset)
+      db.seq += 1;
+      no = `${prefix}-${String(db.seq).padStart(4, '0')}`;
+    }
     r.seq = db.seq;
-    r.no = `${(db.org.prefix || 'RCPT')}-${String(db.seq).padStart(4, '0')}`;
+    r.no = no;
     r.id = uid();
     r.createdAt = new Date().toISOString();
     r.createdBy = user.name || user.username;
@@ -224,6 +230,21 @@ async function api(req, res, url) {
     if (!needTab('receipt')) return;
     const seq = (db.seq || 0) + 1;
     return send(res, 200, { no: `${(db.org.prefix || 'RCPT')}-${String(seq).padStart(4, '0')}` });
+  }
+  if (p === '/api/settings/resetseq' && req.method === 'POST') {
+    if (!needAdmin()) return;
+    let next = Math.floor(Number(body.next));
+    if (!Number.isFinite(next) || next < 1) return send(res, 400, { error: 'Enter a whole number of 1 or more.' });
+    const prefix = db.org.prefix || 'RCPT';
+    const highest = db.transactions.reduce((m, t) => Math.max(m, Number(t.seq) || 0), 0);
+    db.seq = next - 1;                                // next receipt issued will be `next`
+    saveDb();
+    return send(res, 200, {
+      seq: db.seq,
+      no: `${prefix}-${String(next).padStart(4, '0')}`,
+      highestExisting: highest,
+      overlaps: next <= highest                       // hint the UI that used numbers exist above `next`
+    });
   }
 
   // ---- Users (admin only) ----

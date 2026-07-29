@@ -167,10 +167,11 @@ audit logs of who changed what, or emailing receipts, those are natural next ste
 ## 9. Latest changes (this update)
 
 **1. New Receipt — "Rate (Incl. GST)" column removed.**
-The per-service inclusive-rate column no longer appears on the New Receipt screen. Amounts
-are still derived by the backward method from the Paid Amount (inclusive of GST) and
-apportioned across services by their inclusive rate, exactly as before — the column was
-only display clutter and has been taken out.
+The per-service inclusive-rate column no longer appears on the New Receipt screen, nor on
+the printed / PDF receipt. Amounts are still derived by the backward method from the Paid
+Amount (inclusive of GST) and apportioned across services by their inclusive rate, exactly
+as before — the column was only display clutter and has been taken out. The printed receipt
+now lists Service, HSN/SAC, Qty, GST%, Taxable, and Amount.
 
 **2. Searchable partner filter (type-ahead).**
 The partner selector on New Receipt and the associate filter on the Reconciliation tab are
@@ -210,4 +211,13 @@ You can now record a later payment against an earlier receipt's outstanding bala
 
 **Login reminder:** the admin password in the bundled `data.json` has been reset to
 **admin / admin** for this handover. Please change it in the Users tab after signing in.
+
+**5. Settings — reset the Receipt Number.**
+The Settings tab now has a **Receipt numbering** card (admin only). Enter the whole number
+you want the next receipt to use and click **Reset receipt number** — a live preview shows
+the resulting number (e.g. `1` → `RCPT-0001`). Existing receipts are never changed. If the
+number you choose overlaps numbers already in use, the server automatically skips any used
+number when issuing the next receipt, so receipt numbers never repeat. The card also shows
+what the next receipt number currently is. Only admins can do this; the control is hidden
+for everyone else and the action is enforced on the server.
 
