@@ -221,3 +221,11 @@ number when issuing the next receipt, so receipt numbers never repeat. The card 
 what the next receipt number currently is. Only admins can do this; the control is hidden
 for everyone else and the action is enforced on the server.
 
+**6. Organization logo — now built into the app.**
+The **Organization logo** upload field has been removed from the Settings tab. Your logo is
+now embedded directly in the application, so it always appears on the receipt — in the print
+preview and on the printed / PDF output — with nothing to upload or configure. It sits at
+the top-left, beside the organization name. To change the logo in future, send the new image
+and it can be swapped in (it lives as a single `ORG_LOGO` value near the top of
+`public/index.html`).
+
